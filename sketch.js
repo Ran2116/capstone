@@ -510,7 +510,7 @@ function handleSerialInput(incoming) {
         } else if (count === 3) {
           response = "...";
         } else if (count >= 4) {
-          response = "Fine. I'm done being dramatic.";
+          response = "Fine. Let's chat again.";
         }
 
         if (response !== "") {
@@ -558,7 +558,13 @@ function autoMireTalk() {
 }
 
 
-
+function keyPressed() {
+  // Check if Enter was pressed while the inputBox is focused
+  if (keyCode === ENTER && document.activeElement === inputBox.elt) {
+    processUserInput();
+    return false; // Prevents default browser behavior (like adding a newline)
+  }
+}
 
 // ========== UTILS ==========
 
