@@ -1,26 +1,7 @@
-/*
-Keypoints
-All keypoints are indexed by part id. The parts and their ids are:
-
-Id	Part
-0	nose
-1	leftEye
-2	rightEye
-3	leftEar
-4	rightEar
-5	leftShoulder
-6	rightShoulder
-7	leftElbow
-8	rightElbow
-9	leftWrist
-10	rightWrist
-11	leftHip
-12	rightHip
-13	leftKnee
-14	rightKnee
-15	leftAnkle
-16	rightAnkle
-*/
+let cam;
+let detector;
+let poses = [];
+let newPose = null;
 
 let pose = {
   nose: { x: 0, y: 0 },
@@ -43,55 +24,75 @@ let pose = {
 };
 
 const LIGHTNING_CONFIG = {
-  modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING, //default
+  modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
   scoreThreshold: 0.3,
 };
 
-const THUNDER_CONFIG = {
-  modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER,
-  scoreThreshold: 0.3,
-};
-
-const MULTIPOSE_CONFIG = {
-  modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
-  scoreThreshold: 0.3,
-  enableTracking: true,
-};
-
-let cam;
-let detector;
-let poses = [];
-let newPose = null;
-
-function setupMoveNet() {
-  // init webcam
-  navigator.mediaDevices.enumerateDevices().then(gotDevices);
+function setup() {
+  createCanvas(640, 480);
+  initCameraAndPoseModel();
 }
 
-function gotDevices(deviceInfos) {
-  for (let i = 0; i !== deviceInfos.length; ++i) {
-    const deviceInfo = deviceInfos[i];
-    if (deviceInfo.kind == 'videoinput') {
-      console.log("detected webcam", deviceInfo);
-      if (deviceInfo.label.includes("Logitech Webcam")) {
-        console.log("found Logitech Webcam");
-        let constraints = {
-          video: {
-            deviceId: {
-              exact: deviceInfo.deviceId
-            },
-          }
-        }
-        cam = createCapture(constraints, camReady);
-        cam.size(640, 480);
-        cam.hide();
-      }
-    }
+async function initCameraAndPoseModel() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+  let selectedDevice = videoDevices.find(d => d.label.includes("Logitech"));
+  if (!selectedDevice) {
+    console.warn("No Logitech camera found. Falling back to default camera.");
+    selectedDevice = videoDevices[0];
   }
-} 
+
+  if (!selectedDevice) {
+    console.error("No video devices available.");
+    return;
+  }
+
+  let constraints = {
+    video: { deviceId: { exact: selectedDevice.deviceId } }
+  };
+
+  cam = createCapture(constraints, async () => {
+    cam.size(640, 480);
+    cam.hide();
+    console.log("Camera ready:", selectedDevice.label);
+    await loadPoseDetectionModel();
+  });
+}
+
+async function loadPoseDetectionModel() {
+  await tf.ready();
+  const model = poseDetection.SupportedModels.MoveNet;
+  detector = await poseDetection.createDetector(model, LIGHTNING_CONFIG);
+  console.log("Model Loaded: MoveNet");
+}
+
+function draw() {
+  background(0);
+
+  if (cam) {
+    drawMirroredCam(0, 0);
+  }
+
+  updateMoveNet();
+
+  if (poses.length > 0) {
+    drawKeypoints(poses);
+    drawSkeleton(poses);
+    drawKeypointNames(poses);
+  }
+}
+
+function drawMirroredCam(x, y) {
+  push();
+  translate(x, y);
+  translate(cam.width, 0);
+  scale(-1, 1);
+  image(cam, 0, 0);
+  pop();
+}
 
 function updateMoveNet() {
-  // update the estimation
   getPoses();
   if (newPose === null) return;
 
@@ -104,48 +105,21 @@ function updateMoveNet() {
   }
 }
 
-function camReady() {
-  console.log("Webcam Ready!");
-  loadPoseDetectionModel();
-}
-
-async function loadPoseDetectionModel() {
-  tf.ready();
-  const model = poseDetection.SupportedModels.MoveNet;
-  const detectorConfig = LIGHTNING_CONFIG;
-  detector = await poseDetection.createDetector(model, detectorConfig);
-  console.log("Model Loaded: MoveNet");
-}
-
 async function getPoses() {
-  if (detector == undefined) return;
+  if (!detector || !cam) return;
 
   const results = await detector.estimatePoses(cam.elt);
-  
-  if (results.length == 0) return;
-  
-  // let's flip horizontally
+  if (results.length === 0) return;
+
+  // Flip horizontally
   for (const pose of results) {
     for (const p of pose.keypoints) {
       p.x = cam.width - p.x;
     }
   }
 
-  // get the first pose and poses array
-  poses = results;
+  poses = results.map(p => ({ pose: p }));
   newPose = results[0].keypoints;
-}
-
-function drawMirroredCam(x, y) {
-  push();
-  // to position the cam image
-  translate(x, y);
-  // to mirror the webcam image
-  translate(cam.width, 0);
-  scale(-1, 1);
-  // draw the image on the origin position
-  image(cam, 0, 0);
-  pop();
 }
 
 function drawKeypoints(poses) {
@@ -155,7 +129,7 @@ function drawKeypoints(poses) {
   for (let eachPose of poses) {
     for (let keypoint of eachPose.pose.keypoints) {
       if (keypoint.score > 0.2) {
-        ellipse(keypoint.position.x, keypoint.position.y, 10, 10);
+        ellipse(keypoint.x, keypoint.y, 10, 10);
       }
     }
   }
@@ -166,11 +140,10 @@ function drawKeypointNames(poses) {
   push();
   fill(0, 255, 0);
   noStroke();
-  let count = 0;
   for (let eachPose of poses) {
     for (let keypoint of eachPose.pose.keypoints) {
       if (keypoint.score > 0.2) {
-        text(keypoint.part, keypoint.position.x + 15, keypoint.position.y + 5);
+        text(keypoint.name || keypoint.part, keypoint.x + 15, keypoint.y + 5);
       }
     }
   }
@@ -179,11 +152,18 @@ function drawKeypointNames(poses) {
 
 function drawSkeleton(poses) {
   push();
+  stroke(0, 255, 255);
   for (let eachPose of poses) {
-    for (let skeleton of eachPose.skeleton) {
-      const [p1, p2] = skeleton;
-      stroke(0, 255, 255);
-      line(p1.position.x, p1.position.y, p2.position.x, p2.position.y);
+    if (eachPose.pose && eachPose.pose.keypoints && eachPose.pose.keypoints.length) {
+      const kp = eachPose.pose.keypoints;
+      const skeleton = poseDetection.util.getAdjacentPairs(poseDetection.SupportedModels.MoveNet);
+      for (let [i, j] of skeleton) {
+        const p1 = kp[i];
+        const p2 = kp[j];
+        if (p1.score > 0.2 && p2.score > 0.2) {
+          line(p1.x, p1.y, p2.x, p2.y);
+        }
+      }
     }
   }
   pop();
