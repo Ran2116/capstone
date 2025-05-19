@@ -64,20 +64,31 @@ let poses = [];
 let newPose = null;
 
 function setupMoveNet() {
- // init webcam
-  var constraints = {
-  video: {
-      deviceId: {
-        exact: "ccdf1f81d332f54deffeefb0fb7829bf8a224d10e9c6e1086555160783c2fd46"
-      },
+  // init webcam
+  navigator.mediaDevices.enumerateDevices().then(gotDevices);
+}
+
+function gotDevices(deviceInfos) {
+  for (let i = 0; i !== deviceInfos.length; ++i) {
+    const deviceInfo = deviceInfos[i];
+    if (deviceInfo.kind == 'videoinput') {
+      console.log("detected webcam", deviceInfo);
+      if (deviceInfo.label.includes("Logitech Webcam")) {
+        console.log("found Logitech Webcam");
+        let constraints = {
+          video: {
+            deviceId: {
+              exact: deviceInfo.deviceId
+            },
+          }
+        }
+        cam = createCapture(constraints, camReady);
+        cam.size(640, 480);
+        cam.hide();
+      }
     }
-     }
-     cam = createCapture(constraints, camReady);
-  cam.size(640, 480);
-  cam.hide();
-  
-  };
-  
+  }
+} 
 
 function updateMoveNet() {
   // update the estimation
