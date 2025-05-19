@@ -68,7 +68,7 @@ function setupMoveNet() {
   var constraints = {
   video: {
       deviceId: {
-        exact: "0d9aecfeeec1b48053bda107c5786f0bba519290c41c289d8b1a9a182609fb60"
+        exact: "ccdf1f81d332f54deffeefb0fb7829bf8a224d10e9c6e1086555160783c2fd46"
       },
     }
      }
