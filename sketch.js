@@ -327,7 +327,7 @@ function draw() {
     
     let mappedDistance = shoulderDist * 10
     
-    let mapped = map(mappedDistance, 800, 2000, 400, 0);  
+    let mapped = map(mappedDistance, 1200, 2300, 400, 0);  
     
 distanceAlpha = constrain(mapped, 0, 400);
     
