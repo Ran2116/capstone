@@ -378,7 +378,10 @@ refreshBtn.style("opacity", alphaStr);
   fill(255, distanceAlpha);
   text("...Mire sleeping...", width / 2, height / 2);
 
-  if (!waitingForAutoReply && millis() - lastUserInputTime > 50000) {
+  if (!waitingForAutoReply &&
+    millis() - lastUserInputTime > 50000 &&
+    distanceAlpha < 400  
+) {
   waitingForAutoReply = true;
   autoMireTalk();
   lastUserInputTime = millis(); 
